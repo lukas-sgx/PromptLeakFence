@@ -7,7 +7,7 @@
 
 build:
 	@mkdir -p bin
-	@echo "🏗️  Build PLF-cli" && go build -o bin/plf cmd/plf.go
+	@echo "🏗️  Build PLF-cli" && go build -o bin/plf main.go
 	@chmod +x bin/plf
 
 run: build
