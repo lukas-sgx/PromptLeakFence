@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
+
+	// "os"
 	"os/exec"
 
 	"github.com/elazarl/goproxy"
@@ -18,19 +22,22 @@ var (
 )
 
 func setRedirect(from string, to string) {
-    exec.Command("sudo", "iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", from, "-j", "REDIRECT", "--to-ports", to).Run()	
+	exec.Command("sudo", "iptables", "-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", from, "-j", "REDIRECT", "--to-ports", to).Run()
 }
 
 func proxyUp(port string, portLLM string) {
-    proxy := goproxy.NewProxyHttpServer()
-    proxy.Verbose = true
-    proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-        req.URL.Scheme = "http"
-        req.URL.Host = "0.0.0.0:" + portLLM
-        proxy.ServeHTTP(w, req)
-    })
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Verbose = verbose
 
-	log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), proxy))
+	target, _ := url.Parse("http://127.0.0.1:" + portLLM)
+	reverseProxy := httputil.NewSingleHostReverseProxy(target)
+
+	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req.Host = target.Host
+		reverseProxy.ServeHTTP(w, req)
+	})
+
+	log.Fatal(http.ListenAndServe(":"+port, proxy))
 }
 
 func proxyListener() {
