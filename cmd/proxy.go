@@ -23,66 +23,69 @@ var (
 
 func setRedirect(from string, to string) {
 
-    exec.Command("sudo", "iptables", "-t", "nat", "-F").Run()
-    exec.Command("sudo", "iptables", "-t", "nat", "-I", "OUTPUT", "-p", "tcp", "--dport", from, "-m", "owner", "!", "--uid-owner", "0", "-j", "REDIRECT", "--to-ports", to).Run()
-	
+	exec.Command("sudo", "iptables", "-t", "nat", "-F").Run()
+	exec.Command("sudo", "iptables", "-t", "nat", "-I", "OUTPUT", "-p", "tcp", "--dport", from, "-m", "owner", "!", "--uid-owner", "0", "-j", "REDIRECT", "--to-ports", to).Run()
+
 	if verbose {
-    	fmt.Printf("✅ Interception active sur ports %s -> %s\n", from, to)
+		fmt.Printf("📡 Interception active sur ports %s -> %s\n", from, to)
 	}
 }
 
 func proxyUp(port string, portLLM string) {
-    proxy := goproxy.NewProxyHttpServer()
-    proxy.Verbose = verbose
+	proxy := goproxy.NewProxyHttpServer()
+	proxy.Verbose = verbose
 
-    target, _ := url.Parse("http://127.0.0.1:" + portLLM)
-    reverseProxy := httputil.NewSingleHostReverseProxy(target)
+	target, _ := url.Parse("http://127.0.0.1:" + portLLM)
+	reverseProxy := httputil.NewSingleHostReverseProxy(target)
 
-    proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-        req.URL.Scheme = "http"
-        req.URL.Host = target.Host
-        req.Host = target.Host
-        reverseProxy.ServeHTTP(w, req)
-    })
+	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		req.URL.Scheme = "http"
+		req.URL.Host = target.Host
+		req.Host = target.Host
+		reverseProxy.ServeHTTP(w, req)
+	})
 
-    log.Fatal(http.ListenAndServe("0.0.0.0:"+port, proxy))
+	log.Fatal(http.ListenAndServe("0.0.0.0:"+port, proxy))
 }
 
-func proxyListener() {
-	modelPort := map[string]string{
-		"ollama":    "11434",
-		"llama.cpp": "8080",
-		"lmstudio":  "1234",
-		"oobabooga": "7860",
-		"openwebui": "3000",
-	}
+func proxyListener(model map[string]string) {
+	setRedirect(model[targetAddr], listenAddr)
 
-	setRedirect(modelPort[targetAddr], listenAddr)
-	
 	if verbose {
-		fmt.Printf("🚀 Proxy démarré: %s → %s (%s)\n", listenAddr, targetAddr, modelPort[targetAddr])
+		fmt.Printf("🚀 Proxy démarré: %s → %s (%s)\n", listenAddr, targetAddr, model[targetAddr])
 	}
-	proxyUp(listenAddr, modelPort[targetAddr])
-	
+	proxyUp(listenAddr, model[targetAddr])
+
 	if verbose {
 		fmt.Printf("📁 Policy: %s | Verbose: %v\n", policyFile, verbose)
 	}
 }
 
 func checkRoot() {
-    cmd := exec.Command("id", "-u")
-    output, err := cmd.Output()
-    if err != nil {
-        log.Fatal(err)
-    }
-    uid, err := strconv.Atoi(string(output[:len(output)-1]))
-    if err != nil {
-        log.Fatal(err)
-    }
-    if uid != 0 {
-        fmt.Println("This program must be run as root! (sudo)")
+	cmd := exec.Command("id", "-u")
+	output, err := cmd.Output()
+	if err != nil {
+		log.Fatal(err)
+	}
+	uid, err := strconv.Atoi(string(output[:len(output)-1]))
+	if err != nil {
+		log.Fatal(err)
+	}
+	if uid != 0 {
+		fmt.Println("This program must be run as root! (sudo)")
 		os.Exit(1)
-    }
+	}
+}
+
+func checkTarget(model map[string]string) {
+	if _, exists := model[targetAddr]; !exists {
+		fmt.Printf("Target '%s' not found\n", targetAddr)
+		fmt.Println("Available targets:")
+		for name := range model {
+			fmt.Printf("    %s\n", name)
+		}
+		os.Exit(1)
+	}
 }
 
 var proxyCmd = &cobra.Command{
@@ -91,8 +94,18 @@ var proxyCmd = &cobra.Command{
 	Long:    `Intercepte et scanne tous les prompts LLM en temps réel`,
 	GroupID: "security",
 	Run: func(cmd *cobra.Command, args []string) {
+		model := map[string]string{
+			"ollama":    "11434",
+			"llama.cpp": "8080",
+			"lmstudio":  "1234",
+			"oobabooga": "7860",
+			"openwebui": "3000",
+			"copilot":   "5000",
+		}
+
 		checkRoot()
-		proxyListener()
+		checkTarget(model)
+		proxyListener(model)
 	},
 }
 
