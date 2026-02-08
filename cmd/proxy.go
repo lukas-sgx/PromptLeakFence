@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"	
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -31,6 +33,21 @@ func setRedirect(from string, to string) {
 	}
 }
 
+func rewriteRequest(req **http.Request) {
+	if (*req).Body == nil {
+        return
+    }
+
+    bodyBytes, err := io.ReadAll((*req).Body)
+    if err != nil {
+        return
+    }
+
+    (*req).Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	fmt.Println((*req).Body)
+}
+
 func proxyUp(port string, portLLM string) {
 	proxy := goproxy.NewProxyHttpServer()
 	proxy.Verbose = verbose
@@ -39,6 +56,7 @@ func proxyUp(port string, portLLM string) {
 	reverseProxy := httputil.NewSingleHostReverseProxy(target)
 
 	proxy.NonproxyHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		rewriteRequest(&req)
 		req.URL.Scheme = "http"
 		req.URL.Host = target.Host
 		req.Host = target.Host
