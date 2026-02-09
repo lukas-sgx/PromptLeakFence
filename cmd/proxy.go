@@ -1,7 +1,8 @@
 package cmd
 
 import (
-	"bytes"	
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -29,23 +30,55 @@ func setRedirect(from string, to string) {
 	exec.Command("sudo", "iptables", "-t", "nat", "-I", "OUTPUT", "-p", "tcp", "--dport", from, "-m", "owner", "!", "--uid-owner", "0", "-j", "REDIRECT", "--to-ports", to).Run()
 
 	if verbose {
-		fmt.Printf("📡 Interception active sur ports %s -> %s\n", from, to)
+		fmt.Printf("📡 Redirect traffic: %s -> %s\n", from, to)
 	}
 }
 
 func rewriteRequest(req **http.Request) {
+	var data map[string]interface{}
+
 	if (*req).Body == nil {
-        return
-    }
+		return
+	}
 
-    bodyBytes, err := io.ReadAll((*req).Body)
-    if err != nil {
-        return
-    }
+	bodyBytes, err := io.ReadAll((*req).Body)
+	if err != nil {
+		return
+	}
 
-    (*req).Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	if err := json.Unmarshal(bodyBytes, &data); err != nil {
+		if verbose {
+			fmt.Printf("Failed to parse JSON: %v\n", err)
+		}
+		(*req).Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+		return
+	}
 
-	fmt.Println((*req).Body)
+	if msgs, ok := data["messages"].([]interface{}); ok {
+		newMessages := []interface{}{}
+		for _, m := range msgs {
+			msg, ok := m.(map[string]interface{})
+			if !ok {
+				newMessages = append(newMessages, m)
+				continue
+			}
+
+			role, _ := msg["role"].(string)
+			content, _ := msg["content"].(string)
+
+			if role == "assistant" && (content == "[object Object]" || content == "") {
+				continue
+			}
+			
+			newMessages = append(newMessages, msg)
+		}
+		data["messages"] = newMessages
+	}
+
+	bodyBytes, _ = json.Marshal(data)
+	(*req).Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	(*req).ContentLength = int64(len(bodyBytes))
+	(*req).Header.Set("Content-Length", strconv.Itoa(len(bodyBytes)))
 }
 
 func proxyUp(port string, portLLM string) {
@@ -70,7 +103,7 @@ func proxyListener(model map[string]string) {
 	setRedirect(model[targetAddr], listenAddr)
 
 	if verbose {
-		fmt.Printf("🚀 Proxy démarré: %s → %s (%s)\n", listenAddr, targetAddr, model[targetAddr])
+		fmt.Printf("🚀 Proxy start: %s → %s (%s)\n", listenAddr, targetAddr, model[targetAddr])
 	}
 	proxyUp(listenAddr, model[targetAddr])
 
