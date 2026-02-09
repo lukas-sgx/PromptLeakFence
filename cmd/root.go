@@ -34,8 +34,8 @@ func init() {
 	rootCmd.SetHelpFunc(func(c *cobra.Command, a []string) {
 		fmt.Println(`
         ╔══════════════════════════════════════╗
-        ║    PromptLeakFence v0.1.0            ║
-        ║    First LLM Prompt Firewall         ║
+        ║        PromptLeakFence v0.1.0        ║
+        ║          LLM Prompt Firewall         ║
         ╚══════════════════════════════════════╝
         `)
 		c.Usage()
