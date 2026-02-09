@@ -16,7 +16,7 @@ var auditCmd = &cobra.Command{
     Long:    `Analyse et visualise les tentatives de fuites détectées`,
     GroupID: "security",
     Run: func(cmd *cobra.Command, args []string) {
-        fmt.Printf("📊 Audit dashboard sur :%d\n", port)
+        fmt.Printf("📊 Audit dashboard on http://127.0.0.1:%d\n", port)
         fmt.Printf("📁 DB: %s\n", dbPath)
     },
 }
