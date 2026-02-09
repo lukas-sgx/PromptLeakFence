@@ -119,6 +119,8 @@ var proxyCmd = &cobra.Command{
 			"oobabooga": "7860",
 			"openwebui": "3000",
 			"copilot":   "5000",
+			"gemini":    "8080",
+			"claude":    "8080",
 		}
 
 		checkRoot()
