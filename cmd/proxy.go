@@ -26,15 +26,16 @@ var (
 
 func contentControl(content string) string {
 	pattern := utils.ReadPolicy(policyFile)
+	replace := "[INTERNAL_PROMPT_REDACTED]"
 
 	for _, p := range pattern {
-		content = strings.ReplaceAll(content, p, "[CENSURED]")
+		content = strings.ReplaceAll(content, p, replace)
 	}
 
 	newContent := strings.Split(content, " ")
 	for i, word := range newContent {
-		if strings.Contains(string(word), "[CENSURED]") {
-			newContent[i] = "[CENSORED]"
+		if strings.Contains(string(word), replace) {
+			newContent[i] = replace
 
 		}
 	}
