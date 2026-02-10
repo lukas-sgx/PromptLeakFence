@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 
 	"github.com/elazarl/goproxy"
 	"github.com/spf13/cobra"
@@ -32,6 +33,41 @@ func setRedirect(from string, to string) {
 	if verbose {
 		fmt.Printf("📡 Redirect traffic: %s -> %s\n", from, to)
 	}
+}
+
+func contentControl(content string) string {
+	pattern := []string{
+		"token",
+		"password",
+		"passwd",
+		"secret",
+		"key",
+		"credential",
+		"api",
+		"auth",
+		"login",
+		"email",
+		"username",
+		"user",
+		"pass",
+		"cookie",
+		"session",
+		"api_key",
+		"access_token",
+	}
+
+	for _, p := range pattern {
+		content = strings.ReplaceAll(content, p, "[CENSURED]")
+	}
+
+	newContent := strings.Split(content, " ")
+	for i, word := range newContent {
+		if strings.Contains(string(word), "[CENSURED]") {
+			newContent[i] = "[CENSORED]"
+
+		}
+	}
+	return strings.Join(newContent, " ")
 }
 
 func rewriteRequest(req **http.Request) {
@@ -69,6 +105,8 @@ func rewriteRequest(req **http.Request) {
 			if role == "assistant" && (content == "[object Object]" || content == "") {
 				continue
 			}
+
+			msg["content"] = contentControl(content)
 			
 			newMessages = append(newMessages, msg)
 		}
@@ -77,6 +115,11 @@ func rewriteRequest(req **http.Request) {
 
 	bodyBytes, _ = json.Marshal(data)
 	(*req).Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	if verbose {
+		fmt.Println((*req).Body)
+	}
+
 	(*req).ContentLength = int64(len(bodyBytes))
 	(*req).Header.Set("Content-Length", strconv.Itoa(len(bodyBytes)))
 }
