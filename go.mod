@@ -5,6 +5,7 @@ go 1.25.6
 require (
 	github.com/elazarl/goproxy v1.8.1
 	github.com/spf13/cobra v1.10.2
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (

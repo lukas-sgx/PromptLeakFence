@@ -1,0 +1,24 @@
+#############################
+######## BASE CONFIG ########
+#############################
+
+policy:
+  exclude : [
+    "token",
+		"password",
+		"passwd",
+		"secret",
+		"key",
+		"credential",
+		"api",
+		"auth",
+		"login",
+		"email",
+		"username",
+		"user",
+		"pass",
+		"cookie",
+		"session",
+		"api_key",
+		"access_token",
+  ]
