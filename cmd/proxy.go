@@ -9,12 +9,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 
 	"github.com/elazarl/goproxy"
+	"github.com/lukas-sgx/PromptLeakFence/cmd/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -25,36 +24,8 @@ var (
 	verbose    bool
 )
 
-func setRedirect(from string, to string) {
-
-	exec.Command("sudo", "iptables", "-t", "nat", "-F").Run()
-	exec.Command("sudo", "iptables", "-t", "nat", "-I", "OUTPUT", "-p", "tcp", "--dport", from, "-m", "owner", "!", "--uid-owner", "0", "-j", "REDIRECT", "--to-ports", to).Run()
-
-	if verbose {
-		fmt.Printf("📡 Redirect traffic: %s -> %s\n", from, to)
-	}
-}
-
 func contentControl(content string) string {
-	pattern := []string{
-		"token",
-		"password",
-		"passwd",
-		"secret",
-		"key",
-		"credential",
-		"api",
-		"auth",
-		"login",
-		"email",
-		"username",
-		"user",
-		"pass",
-		"cookie",
-		"session",
-		"api_key",
-		"access_token",
-	}
+	pattern := utils.ReadPolicy(policyFile)
 
 	for _, p := range pattern {
 		content = strings.ReplaceAll(content, p, "[CENSURED]")
@@ -107,7 +78,7 @@ func rewriteRequest(req **http.Request) {
 			}
 
 			msg["content"] = contentControl(content)
-			
+
 			newMessages = append(newMessages, msg)
 		}
 		data["messages"] = newMessages
@@ -143,43 +114,13 @@ func proxyUp(port string, portLLM string) {
 }
 
 func proxyListener(model map[string]string) {
-	setRedirect(model[targetAddr], listenAddr)
-
-	if verbose {
-		fmt.Printf("🚀 Proxy start: %s → %s (%s)\n", listenAddr, targetAddr, model[targetAddr])
-	}
-	proxyUp(listenAddr, model[targetAddr])
+	utils.SetRedirect(model[targetAddr], listenAddr, verbose)
 
 	if verbose {
 		fmt.Printf("📁 Policy: %s | Verbose: %v\n", policyFile, verbose)
+		fmt.Printf("🚀 Proxy start: %s → %s (%s)\n", listenAddr, targetAddr, model[targetAddr])
 	}
-}
-
-func checkRoot() {
-	cmd := exec.Command("id", "-u")
-	output, err := cmd.Output()
-	if err != nil {
-		log.Fatal(err)
-	}
-	uid, err := strconv.Atoi(string(output[:len(output)-1]))
-	if err != nil {
-		log.Fatal(err)
-	}
-	if uid != 0 {
-		fmt.Println("This program must be run as root! (sudo)")
-		os.Exit(1)
-	}
-}
-
-func checkTarget(model map[string]string) {
-	if _, exists := model[targetAddr]; !exists {
-		fmt.Printf("Target '%s' not found\n", targetAddr)
-		fmt.Println("Available targets:")
-		for name := range model {
-			fmt.Printf("    %s\n", name)
-		}
-		os.Exit(1)
-	}
+	proxyUp(listenAddr, model[targetAddr])
 }
 
 var proxyCmd = &cobra.Command{
@@ -199,8 +140,8 @@ var proxyCmd = &cobra.Command{
 			"claude":    "8080",
 		}
 
-		checkRoot()
-		checkTarget(model)
+		utils.CheckRoot()
+		utils.CheckTarget(model, targetAddr)
 		proxyListener(model)
 	},
 }
