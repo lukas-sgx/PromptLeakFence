@@ -9,8 +9,11 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/elazarl/goproxy"
 	"github.com/lukas-sgx/PromptLeakFence/cmd/utils"
@@ -36,7 +39,6 @@ func contentControl(content string) string {
 	for i, word := range newContent {
 		if strings.Contains(string(word), replace) {
 			newContent[i] = replace
-
 		}
 	}
 	return strings.Join(newContent, " ")
@@ -143,6 +145,23 @@ var proxyCmd = &cobra.Command{
 
 		utils.CheckRoot()
 		utils.CheckTarget(model, targetAddr)
+
+		sigc := make(chan os.Signal, 1)
+		signal.Notify(sigc,
+			syscall.SIGHUP,
+			syscall.SIGINT,
+			syscall.SIGTERM,
+			syscall.SIGQUIT)
+		go func() {
+			s := <-sigc
+
+			switch s {
+				default:
+					utils.StopRedirect(listenAddr, model[targetAddr], verbose)
+					os.Exit(0)
+			}
+		}()
+
 		proxyListener(model)
 	},
 }
