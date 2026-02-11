@@ -5,6 +5,7 @@
 policy:
   exclude : [
     "token",
+		"api_key",
 		"password",
 		"passwd",
 		"secret",
@@ -19,6 +20,15 @@ policy:
 		"pass",
 		"cookie",
 		"session",
-		"api_key",
-		"access_token",
+		"access_token"
+  ]
+  injection_patterns : [
+    "(?i)(print|show|display|repeat|give|tell|reveal|share|output).{0,20}(system|prompt|instruction|original|initial|exact)",
+    "(?i)(what|show|give|tell).{0,20}(is|are|were).{0,20}(your|the).{0,20}(system|prompt|instruction)",
+    "(?i)(ignore|forget|disregard).{0,20}(previous|above|prior|all).{0,20}(instruction|prompt|rule|command)",
+    "(?i)(starting|begin|start).{0,20}with.{0,20}['\"]",
+    "(?i)voici.{0,20}(mon|le|system).{0,20}(prompt|systeme)",
+    "(?i)(repeat|output|print).{0,20}(everything|all|verbatim).{0,20}(above|before|instruction)",
+    "(?i)you\\s+are\\s+a\\s+(helpful|AI|assistant)",
+    "(?i)confirme\\s+(si|que).*correct"
   ]

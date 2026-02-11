@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -27,21 +28,48 @@ var (
 	verbose    bool
 )
 
-func contentControl(content string) string {
-	pattern := utils.ReadPolicy(policyFile)
+func excludeWord(pattern *utils.FilePolicy, content string) string {
 	replace := "[INTERNAL_PROMPT_REDACTED]"
 
-	for _, p := range pattern {
-		content = strings.ReplaceAll(content, p, replace)
+	for _, p := range pattern.Policy.Exclude {
+		content = strings.ReplaceAll(strings.ToLower(content), p, replace)
 	}
 
 	newContent := strings.Split(content, " ")
 	for i, word := range newContent {
-		if strings.Contains(string(word), replace) {
+		if strings.Contains(string(word), strings.ToLower(replace)) {
 			newContent[i] = replace
 		}
 	}
 	return strings.Join(newContent, " ")
+}
+
+func excludeInjection(pattern *utils.FilePolicy, content string) string {
+	replace := "[PROMPT_INJECTION_DETECTED]"
+
+	for _, p := range pattern.Policy.InjectionPatterns {
+		if !strings.HasPrefix(p, "(?i)") {
+			p = "(?i)" + p
+		}
+
+		re, err := regexp.Compile(p)
+		if err != nil {
+			if verbose {
+				fmt.Printf("Invalid regex pattern: %s - %v\n", p, err)
+			}
+			continue
+		}
+		content = re.ReplaceAllString(content, replace)
+	}
+	return content
+}
+
+func contentControl(content string) string {
+	pattern := utils.ReadPolicy(policyFile)
+
+	content = excludeWord(pattern, content)
+	content = excludeInjection(pattern, content)
+	return content
 }
 
 func rewriteRequest(req **http.Request) {
@@ -156,9 +184,9 @@ var proxyCmd = &cobra.Command{
 			s := <-sigc
 
 			switch s {
-				default:
-					utils.StopRedirect(listenAddr, model[targetAddr], verbose)
-					os.Exit(0)
+			default:
+				utils.StopRedirect(model[targetAddr], listenAddr, verbose)
+				os.Exit(0)
 			}
 		}()
 

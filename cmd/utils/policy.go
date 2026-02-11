@@ -7,14 +7,15 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type filePolicy struct {
+type FilePolicy struct {
 	Policy struct {
-		Exclude []string `yaml:"exclude"`
+		Exclude           []string `yaml:"exclude"`
+		InjectionPatterns []string `yaml:"injection_patterns"`
 	} `yaml:"policy"`
 }
 
-func ReadPolicy(file string) []string {
-	policy := &filePolicy{}
+func ReadPolicy(file string) *FilePolicy {
+	policy := &FilePolicy{}
 	yamlFile, err := os.ReadFile(file)
 
 	if err != nil {
@@ -24,5 +25,5 @@ func ReadPolicy(file string) []string {
 	if err != nil {
 		log.Fatalf("Unmarshal: %v", err)
 	}
-	return policy.Policy.Exclude
+	return policy
 }
